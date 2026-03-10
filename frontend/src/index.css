@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media (max-width: 639px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Single-system responsive rules */
+.admin-content-pad {
+  padding: 0.75rem;
+}
+
+.topbar-title {
+  font-size: 1rem;
+}
+
+.profile-name {
+  display: none;
+}
+
+.dashboard-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.admin-desktop-sidebar {
+  display: none;
+}
+
+.admin-menu-button {
+  display: inline-flex;
+}
+
+@media (min-width: 640px) {
+  .admin-content-pad {
+    padding: 1rem;
+  }
+
+  .dashboard-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .admin-content-pad {
+    padding: 1.5rem;
+  }
+
+  .topbar-title {
+    font-size: 1.125rem;
+  }
+
+  .profile-name {
+    display: inline;
+  }
+
+  .admin-desktop-sidebar {
+    display: block;
+  }
+
+  .admin-menu-button {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-stat-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}

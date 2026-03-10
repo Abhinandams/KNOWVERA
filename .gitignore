@@ -1,0 +1,26 @@
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+**/target/
+
+# Env files (keep examples)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Runtime/user-generated files
+backend/uploads/
+
+# Local caches
+.m2repo/
+
+# Archives
+*.zip
+
+# OS/editor noise
+.DS_Store
+*.log
+.idea/
+.vscode/
