@@ -33,8 +33,10 @@ public class IssueController {
     public ResponseEntity<List<Issue>> getAllIssues(
             @RequestParam(required = false) String fname,
             @RequestParam(required = false) String lname,
+            @RequestParam(name = "q", required = false) String q,
             @AuthenticationPrincipal UserPrincipal principal) {
         boolean hasUserNameFilter = hasText(fname) || hasText(lname);
+        boolean hasQueryFilter = hasText(q);
 
         if (isAdmin(principal)) {
             if (hasUserNameFilter) {
@@ -43,13 +45,16 @@ public class IssueController {
                 }
                 return ResponseEntity.ok(issueService.getIssuesByUserName(fname, lname));
             }
+            if (hasQueryFilter) {
+                return ResponseEntity.ok(issueService.getAllIssues(q));
+            }
             return ResponseEntity.ok(issueService.getAllIssues());
         }
 
         if (hasUserNameFilter) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can search issues by user name");
         }
-        return ResponseEntity.ok(issueService.getIssuesByUserId(principal.getUser().getUserId()));
+        return ResponseEntity.ok(issueService.getIssuesByUserId(principal.getUser().getUserId(), q));
     }
 
     @PostMapping

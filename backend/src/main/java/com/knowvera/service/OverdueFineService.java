@@ -34,6 +34,18 @@ public class OverdueFineService {
 
         for (Issue issue : issues) {
             if ("returned".equalsIgnoreCase(issue.getStatus())) {
+                // Business rule: returned implies any fine is settled. Ensure invariants hold even if
+                // a previous run left remaining amounts due to race/legacy data.
+                fineRepository.findByIssueIssueId(issue.getIssueId()).ifPresent(fine -> {
+                    if (fine.getRemainingFineAmount() != null && fine.getRemainingFineAmount().compareTo(BigDecimal.ZERO) > 0) {
+                        fine.setRemainingFineAmount(BigDecimal.ZERO);
+                    }
+                    fine.setFineStatus("paid");
+                    if (fine.getTotalFineAmount() == null) {
+                        fine.setTotalFineAmount(BigDecimal.ZERO);
+                    }
+                    fineRepository.save(fine);
+                });
                 continue;
             }
 

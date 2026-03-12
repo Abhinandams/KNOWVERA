@@ -85,6 +85,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleDataIntegrityViolationException(
             DataIntegrityViolationException ex,
             HttpServletRequest request) {
+        String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        if (raw != null) {
+            // Postgres check-constraint violations for the books table.
+            if (raw.contains("books_check") || raw.contains("relation \"books\" violates check constraint")) {
+                return buildErrorResponse(HttpStatus.BAD_REQUEST, "Available copies cannot exceed total copies", request);
+            }
+        }
         return buildErrorResponse(HttpStatus.CONFLICT, "Request conflicts with existing data", request);
     }
 

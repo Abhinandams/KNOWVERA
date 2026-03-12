@@ -32,14 +32,29 @@ public class ReservationService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final IssueRepository issueRepository;
+    private final EmailService emailService;
 
     public List<Reservation> getAllReservations() {
+        return getAllReservations(null);
+    }
+
+    public List<Reservation> getAllReservations(String q) {
         cancelExpiredReservations();
+        if (hasText(q)) {
+            return reservationRepository.searchAll(q.trim());
+        }
         return reservationRepository.findAll();
     }
 
     public List<Reservation> getReservationsByUserId(Integer userId) {
+        return getReservationsByUserId(userId, null);
+    }
+
+    public List<Reservation> getReservationsByUserId(Integer userId, String q) {
         cancelExpiredReservations();
+        if (hasText(q)) {
+            return reservationRepository.searchByUserId(userId, q.trim());
+        }
         return reservationRepository.findByUserUserId(userId);
     }
 
@@ -81,13 +96,54 @@ public class ReservationService {
         reservation.setStatus("reserved");
         boolean bookAvailableNow = book.getAvailableCopies() > 0;
         if (bookAvailableNow) {
-            book.setAvailableCopies(book.getAvailableCopies() - 1);
+            applyAvailableCopiesDelta(book, -1);
             bookRepository.saveAndFlush(book);
         }
         int holdDays = bookAvailableNow ? AVAILABLE_BOOK_RESERVATION_DAYS : QUEUE_RESERVATION_DAYS;
         reservation.setExpiryDate(now.plusDays(holdDays));
 
         return reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public void promoteQueueForBook(Book book) {
+        if (book == null) {
+            return;
+        }
+
+        int available = book.getAvailableCopies() == null ? 0 : book.getAvailableCopies();
+        if (available <= 0) {
+            return;
+        }
+
+        List<Reservation> queue = reservationRepository.findByBookBookIdAndStatusOrderByReservedOnAsc(
+                book.getBookId(), "reserved");
+        if (queue.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int remaining = available;
+        for (Reservation reservation : queue) {
+            if (remaining <= 0) {
+                break;
+            }
+            if (isImmediateHoldReservation(reservation)) {
+                continue;
+            }
+
+            reservation.setReservedOn(now);
+            reservation.setExpiryDate(now.plusDays(AVAILABLE_BOOK_RESERVATION_DAYS));
+            reservationRepository.save(reservation);
+            emailService.sendReservationReadyEmail(reservation.getUser(), book);
+            remaining -= 1;
+        }
+
+        int consumed = available - remaining;
+        if (consumed > 0) {
+            applyAvailableCopiesDelta(book, -consumed);
+            bookRepository.saveAndFlush(book);
+        }
     }
 
     @Transactional
@@ -162,7 +218,7 @@ public class ReservationService {
                 throw new ApiException(HttpStatus.CONFLICT, "Another user is ahead in queue");
             }
 
-            book.setAvailableCopies(book.getAvailableCopies() - 1);
+            applyAvailableCopiesDelta(book, -1);
             bookRepository.saveAndFlush(book);
         }
 
@@ -193,7 +249,25 @@ public class ReservationService {
     }
 
     private void releaseHeldCopy(Book book) {
-        book.setAvailableCopies(book.getAvailableCopies() + 1);
+        applyAvailableCopiesDelta(book, 1);
         bookRepository.saveAndFlush(book);
+        promoteQueueForBook(book);
+    }
+
+    private void applyAvailableCopiesDelta(Book book, int delta) {
+        if (book == null) {
+            return;
+        }
+        int total = book.getTotalCopies() == null ? 0 : book.getTotalCopies();
+        int current = book.getAvailableCopies() == null ? 0 : book.getAvailableCopies();
+        int next = current + delta;
+        // Keep within DB check constraint bounds.
+        next = Math.max(0, next);
+        next = Math.min(total, next);
+        book.setAvailableCopies(next);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

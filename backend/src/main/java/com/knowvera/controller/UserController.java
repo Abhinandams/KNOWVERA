@@ -35,8 +35,9 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
+            @RequestParam(name = "q", required = false) String q,
             @PageableDefault(size = 10, sort = "fname") Pageable pageable) {
-        return ResponseEntity.ok(userService.getAllUsers(pageable));
+        return ResponseEntity.ok(userService.getAllUsers(pageable, q));
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -87,7 +88,20 @@ public ResponseEntity<UserResponseDTO> createUser(
     }
 
     @DeleteMapping("/{user_id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable("user_id") Integer userId) {
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable("user_id") Integer userId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        if (!isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can delete users");
+        }
+
+        boolean isSelf = principal.getUser().getUserId().equals(userId);
+        if (isSelf) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot delete the currently logged-in admin");
+        }
+
         userService.deleteUser(userId);
         return ResponseEntity.ok().build();
     }

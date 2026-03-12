@@ -1,6 +1,7 @@
 package com.knowvera.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -10,11 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.knowvera.exception.ApiException;
 import com.knowvera.model.Book;
 import com.knowvera.model.Issue;
+import com.knowvera.model.Payment;
 import com.knowvera.model.Reservation;
 import com.knowvera.model.User;
 import com.knowvera.repository.BookRepository;
 import com.knowvera.repository.FineRepository;
 import com.knowvera.repository.IssueRepository;
+import com.knowvera.repository.PaymentRepository;
 import com.knowvera.repository.ReservationRepository;
 import com.knowvera.repository.UserRepository;
 
@@ -25,14 +28,16 @@ import lombok.RequiredArgsConstructor;
 public class IssueService {
 
     private static final int MAX_ACTIVE_ISSUES_PER_USER = 3;
-    private static final BigDecimal MAX_OUTSTANDING_FINE_FOR_ISSUE = BigDecimal.valueOf(150);
+    private static final BigDecimal MAX_OUTSTANDING_FINE_FOR_ISSUE = BigDecimal.valueOf(500);
 
     private final IssueRepository issueRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final ReservationRepository reservationRepository;
     private final FineRepository fineRepository;
+    private final PaymentRepository paymentRepository;
     private final OverdueFineService overdueFineService;
+    private final ReservationService reservationService;
 
     @Transactional
 public Issue issueBook(Integer userId, Integer bookId) {
@@ -100,12 +105,26 @@ public Issue issueBook(Integer userId, Integer bookId) {
     return issueRepository.save(issue);
 }
 public List<Issue> getAllIssues() {
+    return getAllIssues(null);
+}
+
+public List<Issue> getAllIssues(String q) {
     overdueFineService.refreshOverdueForActiveIssues();
+    if (hasText(q)) {
+        return issueRepository.searchAll(q.trim());
+    }
     return issueRepository.findAll();
 }
 
 public List<Issue> getIssuesByUserId(Integer userId) {
+    return getIssuesByUserId(userId, null);
+}
+
+public List<Issue> getIssuesByUserId(Integer userId, String q) {
     overdueFineService.refreshOverdueForActiveIssues();
+    if (hasText(q)) {
+        return issueRepository.searchByUserId(userId, q.trim());
+    }
     return issueRepository.findByUserUserId(userId);
 }
 
@@ -134,6 +153,34 @@ public Issue getIssueById(Integer issueId) {
         issue.setReturnDate(LocalDate.now());
         issue.setStatus("returned");
 
+        // If there's an overdue fine for this issue, treat the return action as "fine collected"
+        // and close it out. This keeps UI and issue eligibility in sync without requiring a
+        // separate manual payment step.
+        fineRepository.findByIssueIssueId(issueId).ifPresent(fine -> {
+            BigDecimal remaining = fine.getRemainingFineAmount() == null ? BigDecimal.ZERO : fine.getRemainingFineAmount();
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                if (fine.getTotalFineAmount() == null) {
+                    fine.setTotalFineAmount(remaining);
+                }
+
+                Payment payment = new Payment();
+                payment.setFine(fine);
+                payment.setAmountPaid(remaining);
+                payment.setPaymentMethod("cash");
+                payment.setPaymentDate(LocalDateTime.now());
+                paymentRepository.save(payment);
+
+                fine.setRemainingFineAmount(BigDecimal.ZERO);
+                fine.setFineStatus("paid");
+                fineRepository.save(fine);
+            } else {
+                // Normalize to paid when nothing is due.
+                fine.setRemainingFineAmount(BigDecimal.ZERO);
+                fine.setFineStatus("paid");
+                fineRepository.save(fine);
+            }
+        });
+
         Book book = issue.getBook();
         int totalCopies = book.getTotalCopies() == null ? 0 : book.getTotalCopies();
         int currentAvailable = book.getAvailableCopies() == null ? 0 : book.getAvailableCopies();
@@ -142,6 +189,7 @@ public Issue getIssueById(Integer issueId) {
         book.setAvailableCopies(nextAvailable);
 
         bookRepository.saveAndFlush(book);
+        reservationService.promoteQueueForBook(book);
         return issueRepository.save(issue);
     }
 
@@ -151,5 +199,9 @@ public Issue getIssueById(Integer issueId) {
         }
         LocalDate expectedImmediateExpiry = reservation.getReservedOn().toLocalDate().plusDays(1);
         return !reservation.getExpiryDate().toLocalDate().isAfter(expectedImmediateExpiry);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

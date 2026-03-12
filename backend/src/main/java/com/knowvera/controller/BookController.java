@@ -41,11 +41,14 @@ public class BookController {
     
     @GetMapping("/search")
     public Page<BookResponseDTO> searchBooks(
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String author,
             @RequestParam(required = false) String category,
+            @RequestParam(required = false) String publisher,
+            @RequestParam(required = false) String availability,
             @PageableDefault(size = 100, sort = "title") Pageable pageable) {
-        return bookService.searchBooks(title, author, category, pageable);
+        return bookService.searchBooks(q, title, author, category, publisher, availability, pageable);
     }
 
     @PostMapping

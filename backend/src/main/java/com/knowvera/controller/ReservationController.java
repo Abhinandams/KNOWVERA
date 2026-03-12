@@ -32,11 +32,13 @@ public class ReservationController {
     private final ReservationService reservationService;
 
     @GetMapping
-    public ResponseEntity<List<Reservation>> getAllReservations(@AuthenticationPrincipal UserPrincipal principal) {
+    public ResponseEntity<List<Reservation>> getAllReservations(
+            @RequestParam(name = "q", required = false) String q,
+            @AuthenticationPrincipal UserPrincipal principal) {
         if (isAdmin(principal)) {
-            return ResponseEntity.ok(reservationService.getAllReservations());
+            return ResponseEntity.ok(reservationService.getAllReservations(q));
         }
-        return ResponseEntity.ok(reservationService.getReservationsByUserId(principal.getUser().getUserId()));
+        return ResponseEntity.ok(reservationService.getReservationsByUserId(principal.getUser().getUserId(), q));
     }
 
     @PostMapping

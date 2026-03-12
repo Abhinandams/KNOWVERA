@@ -1,14 +1,15 @@
 package com.knowvera.service;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.UUID;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.knowvera.config.CacheConfig;
 import com.knowvera.dto.UserCreateRequestDTO;
 import com.knowvera.dto.UserResponseDTO;
 import com.knowvera.dto.UserUpdateRequestDTO;
@@ -35,37 +37,66 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final IssueRepository issueRepository;
     private final ReservationRepository reservationRepository;
+    private final EmailProbeService emailProbeService;
 
-    public Page<UserResponseDTO> getAllUsers(Pageable pageable) {
-        return userRepository.findByStatusIgnoreCase("active", pageable)
+    @Cacheable(
+            cacheNames = CacheConfig.USERS_PAGE,
+            key = "T(java.util.Objects).toString(#q,'') + '|' + #pageable.toString()")
+    public Page<UserResponseDTO> getAllUsers(Pageable pageable, String q) {
+        if (hasText(q)) {
+            return userRepository.searchActiveOrPendingUsers(q.trim(), pageable).map(this::toResponse);
+        }
+        return userRepository.findByStatusIgnoreCaseIn(List.of("active", "pending"), pageable)
                 .map(this::toResponse);
     }
 
+    @Cacheable(cacheNames = CacheConfig.USERS_BY_ID, key = "#userId")
     public UserResponseDTO getUserById(Integer userId) {
-        User user = userRepository.findByUserIdAndStatusIgnoreCase(userId, "active")
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
+        if ("blocked".equalsIgnoreCase(user.getStatus())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "User not found");
+        }
         return toResponse(user);
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.USERS_BY_ID, CacheConfig.USERS_PAGE }, allEntries = true)
     public UserResponseDTO createUser(UserCreateRequestDTO request) {
         return createUser(request, null);
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.USERS_BY_ID, CacheConfig.USERS_PAGE }, allEntries = true)
     public UserResponseDTO createUser(UserCreateRequestDTO request, MultipartFile image) {
+        if (request == null || !hasText(request.getEmail())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Email is required");
+        }
+
+        String normalizedEmail = request.getEmail().trim();
+        userRepository.findByEmail(normalizedEmail).ifPresent(existing -> {
+            throw new ApiException(HttpStatus.CONFLICT, "Email already exists");
+        });
+
+        boolean smtpVerified = emailProbeService.verifyAddress(normalizedEmail);
+        if (emailProbeService.isStrict() && !smtpVerified) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Email address could not be verified");
+        }
+
         User user = new User();
         user.setFname(request.getFname());
         user.setLname(request.getLname());
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
         user.setAddress(request.getAddress());
         user.setRole(request.getRole() == null ? "user" : request.getRole());
-        user.setStatus(request.getStatus() == null ? "active" : request.getStatus());
+        user.setStatus(request.getStatus() == null ? "pending" : request.getStatus());
         user.setProfileImage(storeProfileImage(image));
 
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        return toResponse(saved);
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.USERS_BY_ID, CacheConfig.USERS_PAGE }, allEntries = true)
     public UserResponseDTO updateUser(Integer userId, UserUpdateRequestDTO request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
@@ -105,6 +136,7 @@ public class UserService {
         return toResponse(userRepository.save(user));
     }
 
+    @CacheEvict(cacheNames = { CacheConfig.USERS_BY_ID, CacheConfig.USERS_PAGE }, allEntries = true)
     public void deleteUser(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "User not found"));
