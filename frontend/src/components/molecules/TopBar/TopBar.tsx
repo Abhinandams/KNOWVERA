@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAdminUserById } from "../../../api/userApi";
 import ProfileMenu from "../ProfileMenu/ProfileMenu";
+import { clearAuthSession, getAuthItem } from "../../../utils/authStorage";
 
 type Props = {
   onMenuClick?: () => void;
@@ -18,14 +19,14 @@ const TopBar = ({
 }: Props) => {
   const navigate = useNavigate();
   const [name, setName] = useState("User");
-  const [role, setRole] = useState(localStorage.getItem("role") ?? "user");
-  const [email, setEmail] = useState(localStorage.getItem("email") ?? "-");
+  const [role, setRole] = useState(getAuthItem("role") ?? "user");
+  const [email, setEmail] = useState(getAuthItem("email") ?? "-");
 
   useEffect(() => {
     const loadProfile = async () => {
-      const userId = localStorage.getItem("userId");
-      const storedEmail = localStorage.getItem("email");
-      const storedRole = localStorage.getItem("role");
+      const userId = getAuthItem("userId");
+      const storedEmail = getAuthItem("email");
+      const storedRole = getAuthItem("role");
       if (storedEmail) setEmail(storedEmail);
       if (storedRole) setRole(storedRole);
 
@@ -46,10 +47,7 @@ const TopBar = ({
   const avatarText = useMemo(() => name.charAt(0).toUpperCase() || "U", [name]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("role");
-    localStorage.removeItem("email");
+    clearAuthSession();
     navigate("/login");
   };
 
@@ -77,6 +75,7 @@ const TopBar = ({
           role={role}
           email={email}
           avatarText={avatarText}
+          onProfile={() => navigate("/admin/profile")}
           onLogout={handleLogout}
         />
       </div>
@@ -85,4 +84,3 @@ const TopBar = ({
 };
 
 export default TopBar;
-

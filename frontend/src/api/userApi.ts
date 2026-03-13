@@ -69,6 +69,7 @@ export const getAdminUsers = async (params?: {
   page?: number;
   size?: number;
   sort?: string;
+  q?: string;
 }) => {
   const { data } = await api.get<PagedResponse<UserResponse>>("/v1/admin/users", { params });
   return data;

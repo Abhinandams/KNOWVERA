@@ -24,6 +24,11 @@ export const getReservations = async () => {
   return data;
 };
 
+export const searchReservations = async (params?: { q?: string }) => {
+  const { data } = await api.get<Reservation[]>("/v1/reservations", { params });
+  return data;
+};
+
 export const createReservation = async (payload: { bookId: number; userId?: number }) => {
   const { data } = await api.post<Reservation>("/v1/reservations", {
     book_id: payload.bookId,

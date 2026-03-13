@@ -23,3 +23,8 @@ export const getAdminFines = async () => {
   const { data } = await api.get<Fine[]>("/v1/admin/fines");
   return data;
 };
+
+export const getUserFines = async (userId: number | string) => {
+  const { data } = await api.get<Fine[]>(`/v1/users/${userId}`);
+  return data;
+};

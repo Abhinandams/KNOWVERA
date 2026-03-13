@@ -17,7 +17,7 @@ export type Issue = {
   };
 };
 
-export const getIssues = async (params?: { fname?: string; lname?: string }) => {
+export const getIssues = async (params?: { fname?: string; lname?: string; q?: string }) => {
   const { data } = await api.get<Issue[]>("/v1/issues", { params });
   return data;
 };

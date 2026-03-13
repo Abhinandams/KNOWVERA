@@ -6,9 +6,10 @@ type Props = {
   email: string;
   avatarText?: string;
   onLogout?: () => void;
+  onProfile?: () => void;
 };
 
-const ProfileMenu = ({ name, role, email, avatarText, onLogout }: Props) => {
+const ProfileMenu = ({ name, role, email, avatarText, onLogout, onProfile }: Props) => {
   const [isOpen, setIsOpen] = useState(false);
   const fallbackAvatar = avatarText ?? name.charAt(0).toUpperCase();
 
@@ -16,8 +17,18 @@ const ProfileMenu = ({ name, role, email, avatarText, onLogout }: Props) => {
     <div className="relative">
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          // In TopBar usage we pass `onProfile`, so clicking this goes directly to the Profile page.
+          if (onProfile) {
+            setIsOpen(false);
+            onProfile();
+            return;
+          }
+          setIsOpen((prev) => !prev);
+        }}
         className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
+        aria-label={onProfile ? "Open profile" : "Open menu"}
+        aria-expanded={!onProfile ? isOpen : undefined}
       >
         <span className="profile-name max-w-[12rem] truncate text-sm text-gray-700">{name}</span>
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-200 text-sm font-semibold text-violet-700">
@@ -25,7 +36,7 @@ const ProfileMenu = ({ name, role, email, avatarText, onLogout }: Props) => {
         </div>
       </button>
 
-      {isOpen && (
+      {!onProfile && isOpen && (
         <div className="absolute right-0 z-20 mt-2 w-64 max-w-[85vw] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-200 text-sm font-semibold text-violet-700">

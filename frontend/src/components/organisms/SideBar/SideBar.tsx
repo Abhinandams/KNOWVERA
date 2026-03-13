@@ -1,5 +1,6 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { clearAuthSession } from "../../../utils/authStorage";
 
 const items = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' as const },
@@ -134,9 +135,17 @@ type Props = {
 };
 
 const SideBar: React.FC<Props> = ({ collapsed = false, onToggleCollapse, showToggle = true, onNavigate }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    clearAuthSession();
+    onNavigate?.();
+    navigate("/login");
+  };
+
   return (
     <aside
-      className={`h-screen overflow-y-auto border-r border-gray-100 bg-white ${
+      className={`flex h-screen flex-col overflow-hidden border-r border-gray-100 bg-white ${
         collapsed ? "w-16 p-3" : "w-64 p-6 md:w-72"
       }`}
     >
@@ -154,7 +163,7 @@ const SideBar: React.FC<Props> = ({ collapsed = false, onToggleCollapse, showTog
         )}
       </div>
 
-      <nav className="flex flex-col gap-2">
+      <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
         {items.map((it) => (
           <NavLink
             to={it.to}
@@ -180,6 +189,39 @@ const SideBar: React.FC<Props> = ({ collapsed = false, onToggleCollapse, showTog
           </NavLink>
         ))}
       </nav>
+
+      <div className="mt-4 border-t border-gray-200 pt-4">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className={
+            collapsed
+              ? "flex w-full items-center justify-center rounded px-2 py-2 text-emerald-700 hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-primary"
+              : "flex w-full items-center gap-3 rounded px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-primary"
+          }
+          aria-label="Logout"
+          title="Logout"
+        >
+          {collapsed && <span className="sr-only">Logout</span>}
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+            <path
+              d="M10 7V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-1"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M15 12H4m0 0 3-3m-3 3 3 3"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {!collapsed && <span className="min-w-0 truncate">Logout</span>}
+        </button>
+      </div>
     </aside>
   );
 };

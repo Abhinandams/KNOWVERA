@@ -1,11 +1,11 @@
-import Form from "../components/organisms/BookForm/Form";
-import Input from "../components/atoms/Input/Input";
+import Form from "../../organisms/BookForm/Form";
+import Input from "../../atoms/Input/Input";
 import { useState } from "react";
-import ActionModal from "../components/organisms/ActionModal/ActionModal";
-import { createBook } from "../api/bookApi";
-import { extractApiErrorMessage } from "../utils/apiError";
-import { logAdminActivity } from "../utils/adminActivity";
-import Button from "../components/atoms/Button/Button";
+import ActionModal from "../../organisms/ActionModal/ActionModal";
+import { createBook } from "../../../api/bookApi";
+import { extractApiErrorMessage } from "../../../utils/apiError";
+import { logAdminActivity } from "../../../utils/adminActivity";
+import Button from "../../atoms/Button/Button";
 import { useNavigate } from "react-router-dom";
 
 const AddBookPage = () => {
@@ -16,6 +16,7 @@ const AddBookPage = () => {
   const [form, setForm] = useState({
     title: "",
     author: "",
+    category: "",
     isbn: "",
     publisher: "",
     totalCopies: "",
@@ -27,9 +28,22 @@ const AddBookPage = () => {
     try {
       const totalCopies = Number(form.totalCopies || 0);
       const submittedTitle = form.title.trim() || "Untitled";
+      const authors = form.author
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const categories = form.category
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
       await createBook({
         title: form.title,
-        author: form.author,
+        // Keep legacy single fields for backward compatibility.
+        author: authors[0] ?? form.author,
+        category: categories[0] ?? form.category,
+        // Canonical multi fields.
+        authors,
+        categories,
         isbn: form.isbn,
         publisher: form.publisher,
         totalCopies,
@@ -43,6 +57,7 @@ const AddBookPage = () => {
       setForm({
         title: "",
         author: "",
+        category: "",
         isbn: "",
         publisher: "",
         totalCopies: "",
@@ -89,7 +104,12 @@ const AddBookPage = () => {
 
       {/* Form container */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-              <Form submitLabel={loading ? "Saving..." : "Save Book"} onSubmit={handleSubmit} showUpload={false}>
+              <Form
+                submitLabel={loading ? "Saving..." : "Save Book"}
+                onSubmit={handleSubmit}
+                onCancel={() => navigate("/admin/books")}
+                showUpload={false}
+              >
                 {error && <p className="col-span-2 text-sm text-red-600">{error}</p>}
 
                 <div className="col-span-2">
@@ -102,10 +122,19 @@ const AddBookPage = () => {
                 </div>
 
                 <div>
-                <label>Author</label>
+                <label>Authors (comma separated)</label>
                 <Input
+                  placeholder="e.g. Jane Doe, John Smith"
                   value={form.author}
                   onChange={(event) => setForm((prev) => ({ ...prev, author: event.target.value }))}
+                />
+                </div>
+                <div>
+                <label>Categories (comma separated)</label>
+                <Input
+                  placeholder="e.g. Science Fiction, Fantasy"
+                  value={form.category}
+                  onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
                 />
                 </div>
                  <div>

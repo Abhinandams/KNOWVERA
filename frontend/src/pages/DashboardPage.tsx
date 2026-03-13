@@ -187,8 +187,7 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 gap-6">
 
           {/* Recent Activity */}
-          <div className="bg-white p-6 rounded-xl shadow-sm">
-            <h3 className="font-semibold mb-4">Recent Activity</h3>
+          <div className="bg-white p-2 rounded-xl shadow-sm">
             {loadingActivities && <p className="text-sm text-gray-500">Loading recent activity...</p>}
             {activityError && <p className="text-sm text-red-600">{activityError}</p>}
             {!loadingActivities && !activityError && activities.length > 0 && (

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import Input from "../components/atoms/Input/Input";
 import Pagination from "../components/organisms/Pagination/Pagination";
 import Table from "../components/organisms/Table/Table";
 import Badge from "../components/atoms/Badge/Badge";
 import type { TableColumn } from "../components/organisms/Table/Table";
-import { getReservations, type Reservation as ApiReservation } from "../api/reservationApi";
+import { searchReservations, type Reservation as ApiReservation } from "../api/reservationApi";
 import { extractApiErrorMessage } from "../utils/apiError";
+import SearchBar from "../components/molecules/SearchBar/SearchBar";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 type ReservationStatus = "Reserved" | "Collected" | "Cancelled";
 
@@ -85,6 +86,7 @@ const columns: TableColumn<Reservation>[] = [
 
 const ReservationsPage = () => {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [page, setPage] = useState(0);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ const ReservationsPage = () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getReservations();
+        const data = await searchReservations({ q: debouncedSearch.trim() || undefined });
         setReservations((Array.isArray(data) ? data : []).map(toUiReservation));
       } catch (err) {
         setError(extractApiErrorMessage(err, "Failed to load reservations."));
@@ -105,33 +107,28 @@ const ReservationsPage = () => {
       }
     };
     loadReservations();
-  }, []);
+  }, [debouncedSearch]);
 
-  const filteredReservations = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return reservations;
-    return reservations.filter((reservation) =>
-      [reservation.memberName, reservation.memberEmail, reservation.id]
-        .some((value) => value.toLowerCase().includes(keyword))
-    );
-  }, [reservations, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReservations.length / pageSize));
-  const pagedReservations = filteredReservations.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.max(1, Math.ceil(reservations.length / pageSize));
+  const pagedReservations = reservations.slice(page * pageSize, (page + 1) * pageSize);
 
   useEffect(() => {
     if (page > totalPages - 1) setPage(0);
   }, [page, totalPages]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
 
  
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <Input
+          <SearchBar
             placeholder="Search by name, email, or reservation ID..."
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={setSearch}
           />
         </div>
 
@@ -143,7 +140,7 @@ const ReservationsPage = () => {
             <h3 className="font-semibold text-gray-900">Reservation Queue</h3>
             <p className="text-sm text-gray-500">Manage active and pending reservation requests.</p>
           </div>
-          <Badge text={`Total: ${filteredReservations.length} Reservations`} variant="neutral" />
+          <Badge text={`Total: ${reservations.length} Reservations`} variant="neutral" />
         </div>
 
         {loading && <p className="text-sm text-gray-500">Loading reservations...</p>}

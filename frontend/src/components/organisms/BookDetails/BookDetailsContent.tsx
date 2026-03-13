@@ -7,6 +7,7 @@ type Props = {
   book: UserBook;
   onBack: () => void;
   backLabel: string;
+  showTotalCopies?: boolean;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
   primaryActionClassName?: string;
@@ -20,6 +21,7 @@ const BookDetailsContent = ({
   book,
   onBack,
   backLabel,
+  showTotalCopies = true,
   primaryActionLabel,
   onPrimaryAction,
   primaryActionClassName = "",
@@ -30,7 +32,7 @@ const BookDetailsContent = ({
 }: Props) => {
   const metadata = [
     { label: "Book ID", value: String(book.id) },
-    { label: "Total Copies", value: String(book.totalCopies ?? "-") },
+    ...(showTotalCopies ? [{ label: "Total Copies", value: String(book.totalCopies ?? "-") }] : []),
     { label: "Available Copies", value: String(book.availableCopies ?? "-") },
     { label: "Publisher", value: book.publisher },
     { label: "ISBN-13", value: book.isbn },

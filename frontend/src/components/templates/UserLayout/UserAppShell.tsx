@@ -2,11 +2,13 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import ProfileMenu from "../../molecules/ProfileMenu/ProfileMenu";
 import { getAdminUserById } from "../../../api/userApi";
+import { clearAuthSession, getAuthItem } from "../../../utils/authStorage";
 
 const resolveTitle = (pathname: string) => {
   if (pathname.startsWith("/user/books/")) return "Book Information";
   if (pathname.startsWith("/user/books")) return "Books";
   if (pathname.startsWith("/user/status")) return "Status";
+  if (pathname.startsWith("/user/profile")) return "My Profile";
   return "DASHBOARD";
 };
 
@@ -73,14 +75,14 @@ const UserAppShell = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileSidebarId = useId();
   const [name, setName] = useState("User");
-  const [role, setRole] = useState(localStorage.getItem("role") ?? "user");
-  const [email, setEmail] = useState(localStorage.getItem("email") ?? "-");
+  const [role, setRole] = useState(getAuthItem("role") ?? "user");
+  const [email, setEmail] = useState(getAuthItem("email") ?? "-");
 
   useEffect(() => {
     const loadProfile = async () => {
-      const userId = localStorage.getItem("userId");
-      const storedEmail = localStorage.getItem("email");
-      const storedRole = localStorage.getItem("role");
+      const userId = getAuthItem("userId");
+      const storedEmail = getAuthItem("email");
+      const storedRole = getAuthItem("role");
       if (storedEmail) setEmail(storedEmail);
       if (storedRole) setRole(storedRole);
 
@@ -110,10 +112,7 @@ const UserAppShell = () => {
   }, [mobileMenuOpen]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("role");
-    localStorage.removeItem("email");
+    clearAuthSession();
     navigate("/login");
   };
 
@@ -127,41 +126,79 @@ const UserAppShell = () => {
         }`;
 
   const navContent = (compact: boolean, onNavigate?: () => void) => (
-    <nav className="space-y-2">
-      <NavLink
-        to="/user/dashboard"
-        title="Dashboard"
-        aria-label="Dashboard"
-        onClick={onNavigate}
-        className={({ isActive }) => navClassName(isActive, compact)}
-      >
-        {compact && <span className="sr-only">Dashboard</span>}
-        <UserNavIcon name="dashboard" className="text-current" />
-        {!compact && <span className="min-w-0 truncate">Dashboard</span>}
-      </NavLink>
-      <NavLink
-        to="/user/books"
-        title="Books"
-        aria-label="Books"
-        onClick={onNavigate}
-        className={({ isActive }) => navClassName(isActive, compact)}
-      >
-        {compact && <span className="sr-only">Books</span>}
-        <UserNavIcon name="books" className="text-current" />
-        {!compact && <span className="min-w-0 truncate">Books</span>}
-      </NavLink>
-      <NavLink
-        to="/user/status"
-        title="Status"
-        aria-label="Status"
-        onClick={onNavigate}
-        className={({ isActive }) => navClassName(isActive, compact)}
-      >
-        {compact && <span className="sr-only">Status</span>}
-        <UserNavIcon name="status" className="text-current" />
-        {!compact && <span className="min-w-0 truncate">Status</span>}
-      </NavLink>
-    </nav>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        <NavLink
+          to="/user/dashboard"
+          title="Dashboard"
+          aria-label="Dashboard"
+          onClick={onNavigate}
+          className={({ isActive }) => navClassName(isActive, compact)}
+        >
+          {compact && <span className="sr-only">Dashboard</span>}
+          <UserNavIcon name="dashboard" className="text-current" />
+          {!compact && <span className="min-w-0 truncate">Dashboard</span>}
+        </NavLink>
+        <NavLink
+          to="/user/books"
+          title="Books"
+          aria-label="Books"
+          onClick={onNavigate}
+          className={({ isActive }) => navClassName(isActive, compact)}
+        >
+          {compact && <span className="sr-only">Books</span>}
+          <UserNavIcon name="books" className="text-current" />
+          {!compact && <span className="min-w-0 truncate">Books</span>}
+        </NavLink>
+        <NavLink
+          to="/user/status"
+          title="Status"
+          aria-label="Status"
+          onClick={onNavigate}
+          className={({ isActive }) => navClassName(isActive, compact)}
+        >
+          {compact && <span className="sr-only">Status</span>}
+          <UserNavIcon name="status" className="text-current" />
+          {!compact && <span className="min-w-0 truncate">Status</span>}
+        </NavLink>
+      </nav>
+
+      <div className="mt-4 border-t border-gray-200 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            handleLogout();
+          }}
+          className={
+            compact
+              ? "flex w-full items-center justify-center rounded-lg px-2 py-2 text-sm font-semibold text-gray-700 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-primary"
+              : "flex w-full items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-primary"
+          }
+          aria-label="Logout"
+          title="Logout"
+        >
+          {compact && <span className="sr-only">Logout</span>}
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+            <path
+              d="M10 7V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-1"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M15 12H4m0 0 3-3m-3 3 3 3"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {!compact && <span className="min-w-0 truncate">Logout</span>}
+        </button>
+      </div>
+    </div>
   );
 
   return (
@@ -184,7 +221,7 @@ const UserAppShell = () => {
           aria-modal="true"
           aria-label="Sidebar"
         >
-          <aside className="h-full overflow-y-auto border-r border-gray-200 bg-white p-6">
+          <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-gray-200 bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-2xl font-bold text-emerald-700">KNOWVERA</div>
               <button
@@ -202,7 +239,7 @@ const UserAppShell = () => {
       </div>
 
       <aside
-        className={`hidden overflow-y-auto border-r border-gray-200 bg-white transition-all duration-300 md:block ${
+        className={`hidden h-full min-h-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-all duration-300 md:flex ${
           collapsed ? "w-16 p-3" : "w-64 p-6 lg:w-72"
         }`}
       >
@@ -241,6 +278,7 @@ const UserAppShell = () => {
               role={role}
               email={email}
               avatarText={avatarText}
+              onProfile={() => navigate("/user/profile")}
               onLogout={handleLogout}
             />
           </div>

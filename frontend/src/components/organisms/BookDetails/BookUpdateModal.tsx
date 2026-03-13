@@ -51,7 +51,11 @@ const BookUpdateModal = ({ isOpen, book, onClose, onSave }: Props) => {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input label="Title" value={form.title} onChange={(e) => handleChange("title", e.target.value)} />
-          <Input label="Author" value={form.author} onChange={(e) => handleChange("author", e.target.value)} />
+          <Input
+            label="Authors (comma separated)"
+            value={form.author}
+            onChange={(e) => handleChange("author", e.target.value)}
+          />
           <Input label="Publisher" value={form.publisher} onChange={(e) => handleChange("publisher", e.target.value)} />
           <Input label="ISBN-13" value={form.isbn} onChange={(e) => handleChange("isbn", e.target.value)} />
           <Input

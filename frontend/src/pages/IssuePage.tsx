@@ -10,7 +10,8 @@ import Table from "../components/organisms/Table/Table";
 import Button from "../components/atoms/Button/Button";
 import Badge from "../components/atoms/Badge/Badge";
 import Pagination from "../components/organisms/Pagination/Pagination";
-import Input from "../components/atoms/Input/Input";
+import SearchBar from "../components/molecules/SearchBar/SearchBar";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 
 const IssueReturnPage = () => {
@@ -20,6 +21,7 @@ const IssueReturnPage = () => {
   const [bookId, setBookId] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Returned" | "Not Returned">("All");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [page, setPage] = useState(0);
   const [issuing, setIssuing] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -28,10 +30,10 @@ const IssueReturnPage = () => {
   const [error, setError] = useState<string | null>(null);
   const pageSize = 10;
 
-  const loadIssues = async () => {
+  const loadIssues = async (q?: string) => {
     setLoadingIssues(true);
     try {
-      const data = await getIssues();
+      const data = await getIssues({ q: q && q.trim().length > 0 ? q.trim() : undefined });
       setIssues(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(extractApiErrorMessage(err, "Failed to load issues."));
@@ -41,8 +43,8 @@ const IssueReturnPage = () => {
   };
 
   useEffect(() => {
-    loadIssues();
-  }, []);
+    loadIssues(debouncedSearch);
+  }, [debouncedSearch]);
 
   const formatDate = (value?: string | null) => {
     if (!value) return "-";
@@ -92,58 +94,49 @@ const IssueReturnPage = () => {
     {
       key: "action",
       header: "Action",
-      render: (row: (typeof issueRows)[number]) => (
-        <Button
-          type="button"
-          variant={row.status === "returned" ? "ghost" : "primary"}
-          disabled={row.status === "returned" || returning}
-          onClick={
-            row.status === "returned"
-              ? undefined
-              : async () => {
-                  setReturning(true);
-                  setError(null);
-                  try {
-                    const returned = await returnIssue(row.issueId);
-                    const returnUserId = Number(returned.user?.userId ?? 0);
-                    logAdminActivity({
-                      title: returned.book?.title ?? `Issue #${row.issueId}`,
-                      subtitle:
-                        `Returned by ${returned.user?.fname ?? ""} ${returned.user?.lname ?? ""}`.trim() ||
-                        (returnUserId > 0 ? `Returned by user #${returnUserId}` : "Book returned"),
-                    });
-                    setModalType("book_returned");
-                    await loadIssues();
-                  } catch (err) {
-                    setError(extractApiErrorMessage(err, "Failed to return book."));
-                  } finally {
-                    setReturning(false);
-                  }
-                }
-          }
-        >
-          {row.status === "returned" ? "Returned" : "Return"}
-        </Button>
-      ),
+      render: (row: (typeof issueRows)[number]) =>
+        row.status === "returned" ? (
+          <span className="text-sm text-gray-400">No Action</span>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={returning}
+            onClick={async () => {
+              setReturning(true);
+              setError(null);
+              try {
+                const returned = await returnIssue(row.issueId);
+                const returnUserId = Number(returned.user?.userId ?? 0);
+                logAdminActivity({
+                  title: returned.book?.title ?? `Issue #${row.issueId}`,
+                  subtitle:
+                    `Returned by ${returned.user?.fname ?? ""} ${returned.user?.lname ?? ""}`.trim() ||
+                    (returnUserId > 0 ? `Returned by user #${returnUserId}` : "Book returned"),
+                });
+                setModalType("book_returned");
+                await loadIssues(debouncedSearch);
+              } catch (err) {
+                setError(extractApiErrorMessage(err, "Failed to return book."));
+              } finally {
+                setReturning(false);
+              }
+            }}
+          >
+            Return
+          </Button>
+        ),
     },
   ];
 
   const filteredIssueRows = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
     return issueRows.filter((row) => {
       const matchesStatus =
         statusFilter === "All" ||
         (statusFilter === "Returned" ? row.status === "returned" : row.status !== "returned");
-
-      const matchesSearch =
-        keyword.length === 0 ||
-        [String(row.issueId), row.member, row.book, String(row.userId), String(row.bookId)]
-          .some((value) => value.toLowerCase().includes(keyword));
-
-      return matchesStatus && matchesSearch;
+      return matchesStatus;
     });
-  }, [issueRows, statusFilter, search]);
+  }, [issueRows, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredIssueRows.length / pageSize));
   const pagedIssueRows = filteredIssueRows.slice(page * pageSize, (page + 1) * pageSize);
@@ -190,10 +183,10 @@ const IssueReturnPage = () => {
             <option value="Not Returned">Issued</option>
           </select>
         </div>
-        <Input
+        <SearchBar
           placeholder="Search by username, book name, user ID, or book ID..."
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={setSearch}
         />
         {loadingIssues && <p className="text-sm text-gray-500">Loading issues...</p>}
         {!loadingIssues && (
@@ -258,7 +251,7 @@ const IssueReturnPage = () => {
                   setUserId("");
                   setBookId("");
                   setIsIssueModalOpen(false);
-                  await loadIssues();
+                  await loadIssues(debouncedSearch);
                 } catch (err) {
                   setError(extractApiErrorMessage(err, "Failed to issue book."));
                 } finally {

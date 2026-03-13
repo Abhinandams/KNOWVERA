@@ -1,7 +1,9 @@
 package com.knowvera.security;
 
+import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +34,8 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -91,9 +95,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-            "http://localhost:5173"
-        ));
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

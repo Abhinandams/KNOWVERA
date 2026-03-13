@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Input from "../components/atoms/Input/Input";
 import Button from "../components/atoms/Button/Button";
 import Badge from "../components/atoms/Badge/Badge";
 import { getAllBooks, type Book } from "../api/bookApi";
@@ -8,6 +7,8 @@ import type { UserBook } from "../types/book";
 import Pagination from "../components/organisms/Pagination/Pagination";
 import { extractApiErrorMessage } from "../utils/apiError";
 import { getCategoryCover } from "../utils/bookCover";
+import SearchBar from "../components/molecules/SearchBar/SearchBar";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 
 const toUiBook = (b: Book): UserBook => {
   const category = String(
@@ -22,6 +23,7 @@ const toUiBook = (b: Book): UserBook => {
   image: getCategoryCover(category),
   status: Number(b.availableCopies ?? b.available_copies ?? 0) > 0 ? "Available" : "Unavailable",
   totalCopies: Number(b.totalCopies ?? b.total_copies ?? 1),
+  availableCopies: Number(b.availableCopies ?? b.available_copies ?? 0),
   isbn: String(b.isbn ?? "-"),
   firstPublished: String(b.firstPublished ?? b.first_published ?? "-"),
   language: String(b.language ?? "English"),
@@ -34,6 +36,7 @@ const UserBooksPage = () => {
   const navigate = useNavigate();
   const [userBooks, setUserBooks] = useState<UserBook[]>([]);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [availabilityFilter, setAvailabilityFilter] = useState("All Books");
   const [page, setPage] = useState(0);
@@ -63,7 +66,7 @@ const UserBooksPage = () => {
   );
 
   const filteredBooks = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword = debouncedSearch.trim().toLowerCase();
     return userBooks.filter((book) => {
       const matchesSearch =
         keyword.length === 0 ||
@@ -77,7 +80,7 @@ const UserBooksPage = () => {
         (availabilityFilter === "Available" ? book.status === "Available" : book.status === "Unavailable");
       return matchesSearch && matchesCategory && matchesAvailability;
     });
-  }, [userBooks, search, categoryFilter, availabilityFilter]);
+  }, [userBooks, debouncedSearch, categoryFilter, availabilityFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBooks.length / pageSize));
   const pagedBooks = filteredBooks.slice(page * pageSize, (page + 1) * pageSize);
@@ -102,10 +105,10 @@ const UserBooksPage = () => {
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <div className="lg:col-span-6">
-            <Input
+            <SearchBar
               placeholder="Search by title, author, or publisher..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={setSearch}
             />
           </div>
 
@@ -131,19 +134,6 @@ const UserBooksPage = () => {
             <option>Available</option>
             <option>Unavailable</option>
           </select>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="border-violet-200 text-violet-700 hover:bg-violet-50 lg:col-span-2"
-            onClick={() => {
-              setSearch("");
-              setCategoryFilter("All Categories");
-              setAvailabilityFilter("All Books");
-            }}
-          >
-            Reset
-          </Button>
         </div>
       </div>
 
@@ -156,19 +146,19 @@ const UserBooksPage = () => {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!loading && !error && <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {pagedBooks.map((book) => (
-          <div key={book.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div key={book.id} className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm ">
             <div className="relative">
               <img src={book.image} alt={book.title} className="h-72 w-full object-cover" />
               <div className="absolute right-3 top-3">
                 <Badge text={book.status} variant={book.status === "Available" ? "success" : "danger"} />
               </div>
             </div>
-
+          <div className="flex flex-1 flex-col justify-between p-4">
             <div className="space-y-2 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-violet-500">{book.publisher}</p>
               <h3 className="text-xl font-semibold text-gray-900">{book.title}</h3>
               <p className="text-sm text-gray-500">{book.author}</p>
-
+          </div>
               <Button
                 type="button"
                 variant="ghost"

@@ -4,11 +4,12 @@ type Props = {
   children: React.ReactNode;
   submitLabel: string;
   onSubmit?: () => void;
+  onCancel?: () => void;
   uploadSection?: React.ReactNode;
   showUpload?: boolean;
 };
 
-const Form= ({ children, submitLabel, onSubmit, uploadSection, showUpload = true }: Props) => {
+const Form= ({ children, submitLabel, onSubmit, onCancel, uploadSection, showUpload = true }: Props) => {
   return (
     <div className={showUpload ? "grid grid-cols-3 gap-6" : ""}>
       {showUpload && (
@@ -21,7 +22,9 @@ const Form= ({ children, submitLabel, onSubmit, uploadSection, showUpload = true
         {children}
 
         <div className="col-span-2 flex justify-end gap-3 mt-6">
-          <Button variant="ghost">Cancel</Button>
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button type="button" variant="primary" onClick={onSubmit}>
             {submitLabel}
           </Button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import Input from "../components/atoms/Input/Input";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import Button from "../components/atoms/Button/Button";
 import Pagination from "../components/organisms/Pagination/Pagination";
 import { Link, useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import type { TableColumn } from "../components/organisms/Table/Table";
 import { getAdminUsers, resolveUserProfileImage, type UserResponse } from "../api/userApi";
 import { getIssues, type Issue } from "../api/issueApi";
 import { extractApiErrorMessage } from "../utils/apiError";
+import SearchBar from "../components/molecules/SearchBar/SearchBar";
 
 type Member = {
   id: string;
@@ -115,6 +116,7 @@ const columns: TableColumn<Member>[] = [
 const UsersPage = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query, 1000);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -127,7 +129,7 @@ const UsersPage = () => {
       setError(null);
       try {
         const [data, issuesData] = await Promise.all([
-          getAdminUsers({ page, size: 10, sort: "fname" }),
+          getAdminUsers({ page, size: 10, sort: "fname", q: debouncedQuery.trim() || undefined }),
           getIssues(),
         ]);
         const issuedCountByUser = buildIssuedCountByUser(Array.isArray(issuesData) ? issuesData : []);
@@ -153,15 +155,11 @@ const UsersPage = () => {
     }, 30000);
 
     return () => window.clearInterval(intervalId);
-  }, [page]);
+  }, [page, debouncedQuery]);
 
-  const filteredMembers = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return members;
-    return members.filter((m) =>
-      [m.name, m.email, m.id].some((value) => value.toLowerCase().includes(keyword))
-    );
-  }, [members, query]);
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedQuery]);
 
   return (
     <div className="space-y-6">
@@ -170,10 +168,10 @@ const UsersPage = () => {
       <div className="flex gap-4 items-center">
 
         <div className="flex-1">
-          <Input
+          <SearchBar
             placeholder="Search by name, email, or member ID..."
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={setQuery}
           />
         </div>
 
@@ -186,7 +184,7 @@ const UsersPage = () => {
       {/* Table */}
       {loading && <p className="text-sm text-gray-500">Loading users...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && !error && <Table columns={columns} data={filteredMembers} rowKey={(user) => user.id} />}
+      {!loading && !error && <Table columns={columns} data={members} rowKey={(user) => user.id} />}
       {/* Pagination */}
       {!loading && !error && <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />}
 

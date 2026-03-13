@@ -8,9 +8,12 @@ import ActionModal from "../components/organisms/ActionModal/ActionModal";
 import type { ActionModalType } from "../components/organisms/ActionModal/ActionModal";
 import { getReservations, updateReservationStatus } from "../api/reservationApi";
 import { getIssues } from "../api/issueApi";
+import { getUserFines } from "../api/fineApi";
 import { extractApiErrorMessage } from "../utils/apiError";
+import { getAuthItem } from "../utils/authStorage";
 
 type StatusRow = {
+  issueId?: number;
   reservationId?: number;
   title: string;
   issueDate: string;
@@ -45,8 +48,24 @@ const StatusPage = () => {
       setLoadingIssued(true);
       setErrorIssued(null);
       try {
-        const data = await getIssues();
+        const userId = getAuthItem("userId");
+        const [data, finesData] = await Promise.all([
+          getIssues(),
+          userId ? getUserFines(userId) : Promise.resolve([]),
+        ]);
         const issues = Array.isArray(data) ? data : [];
+        const fines = Array.isArray(finesData) ? finesData : [];
+        const fineAmountByIssueId = new Map<number, number>();
+        for (const fine of fines) {
+          const issueId = Number(fine.issue?.issueId ?? 0);
+          if (!issueId) continue;
+          const remaining = Number(fine.remainingFineAmount ?? 0);
+          fineAmountByIssueId.set(issueId, Number.isFinite(remaining) ? remaining : 0);
+        }
+        const formatMoney = (amount: number) => {
+          const n = Number.isFinite(amount) ? amount : 0;
+          return `$${n.toFixed(2)}`;
+        };
 
         const issuedRows: StatusRow[] = issues
           .filter((issue) => {
@@ -56,25 +75,32 @@ const StatusPage = () => {
           .map((issue) => {
             const normalizedStatus = String(issue.status ?? "").toLowerCase();
             const isOverdue = normalizedStatus === "overdue";
+            const issueId = Number(issue.issueId ?? 0);
+            const fineAmount = isOverdue ? fineAmountByIssueId.get(issueId) ?? 0 : 0;
             return {
+              issueId,
               title: issue.book?.title ?? "Unknown Book",
               issueDate: issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : "-",
               returnDate: issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-",
               status: <Badge text={isOverdue ? "Overdue" : "Active"} variant={isOverdue ? "danger" : "success"} />,
-              fine: "-",
+              fine: isOverdue ? formatMoney(fineAmount) : "-",
             };
           });
 
         const fineRows: StatusRow[] = issues
           .filter((issue) => String(issue.status ?? "").toLowerCase() === "overdue")
-          .map((issue) => ({
-            title: issue.book?.title ?? "Unknown Book",
-            issueDate: issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : "-",
-            returnDate: issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-",
-            status: <Badge text="Overdue" variant="danger" />,
-            fine: "Pending",
-            action: <Button variant="danger">Pay Fine</Button>,
-          }));
+          .map((issue) => {
+            const issueId = Number(issue.issueId ?? 0);
+            const fineAmount = fineAmountByIssueId.get(issueId) ?? 0;
+            return {
+              issueId,
+              title: issue.book?.title ?? "Unknown Book",
+              issueDate: issue.issueDate ? new Date(issue.issueDate).toLocaleDateString() : "-",
+              returnDate: issue.dueDate ? new Date(issue.dueDate).toLocaleDateString() : "-",
+              status: <Badge text="Overdue" variant="danger" />,
+              fine: formatMoney(fineAmount),
+            };
+          });
 
         setIssuedBooks(issuedRows);
         setFineBooks(fineRows);
@@ -141,8 +167,15 @@ const StatusPage = () => {
   if (activeTab === "reserved") tableData = reservedBooks;
   if (activeTab === "fine") tableData = fineBooks;
 
+  // Remove fine column for reservations; keep cancel for reservations only.
   const visibleColumns =
-    activeTab === "issued" ? columns.filter((column) => column.key !== "action") : columns;
+    activeTab === "reserved"
+      ? columns
+          .filter((column) => column.key !== "fine")
+          .map((column) =>
+            column.key === "issueDate" ? { ...column, header: "Reserved On" } : column
+          )
+      : columns.filter((column) => column.key !== "action");
 
   return (
     <div className="space-y-6">

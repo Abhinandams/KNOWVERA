@@ -3,11 +3,11 @@ import DashboardPage from "./pages/DashboardPage";
 import { Routes, Route, Navigate } from "react-router-dom"
 import Appshell from "./components/templates/DashboardLayout/AppShell";
 import BookDetailsPage from "./pages/BookDetailedPage";
-import AddBookPage from "./pages/AddBookPage";
+import AddBookPage from "./components/molecules/SearchBar/AddBookPage";
 import UsersPage from "./pages/UserPage";
 import AddUserPage from "./pages/AddUserPage";
 import FineDetailsPage from "./pages/FineDetailsPage";
-import IssueReturnPage from "./pages/IssueReturnPage";
+import IssueReturnPage from "./pages/IssuePage";
 import StatusPage from "./pages/StatusPage";
 import ReservationsPage from "./pages/ReservationsPage";
 import LoginPage from "./pages/LoginPage";
@@ -16,6 +16,7 @@ import UserBooksPage from "./pages/UserBooksPage";
 import UserBookDetailsPage from "./pages/UserBookDetailsPage";
 import UserDetailsPage from "./pages/UserDetailsPage";
 import UserAppShell from "./components/templates/UserLayout/UserAppShell";
+import ProfilePage from "./pages/ProfilePage";
 
 
 function App() {
@@ -28,12 +29,14 @@ function App() {
         <Route path="books" element={<UserBooksPage />} />
         <Route path="books/:id" element={<UserBookDetailsPage />} />
         <Route path="status" element={<StatusPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route element={<Appshell />}>
         <Route index element={<Navigate to="/login" replace />} />
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/admin/dashboard" element={<DashboardPage />} />
+        <Route path="/admin/profile" element={<ProfilePage />} />
         <Route path="/admin/fines" element={<FineDetailsPage />} />
         <Route path="/admin/reservations" element={<ReservationsPage />} />
         <Route path="/admin/books" element={<BooksPage />} />

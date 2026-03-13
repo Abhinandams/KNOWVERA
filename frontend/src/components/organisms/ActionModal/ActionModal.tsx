@@ -7,6 +7,8 @@ export type ActionModalType =
   | "book_deleted"
   | "book_updated"
   | "book_reserved"
+  | "reservation_hold"
+  | "reservation_queue"
   | "reservation_cancelled"
   | "user_updated";
 
@@ -47,6 +49,14 @@ const modalContent: Record<ActionModalType, ModalContent> = {
   book_reserved: {
     title: "Book Reserved Successfully",
     description: "This title has been reserved for your account.",
+  },
+  reservation_hold: {
+    title: "Reservation Confirmed",
+    description: "Issue this book within 24 hours to keep the reservation active.",
+  },
+  reservation_queue: {
+    title: "Added to Queue",
+    description: "This book is currently unavailable. You are now in the queue.",
   },
   reservation_cancelled: {
     title: "Reservation Cancelled",

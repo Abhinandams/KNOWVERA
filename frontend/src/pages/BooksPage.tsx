@@ -1,4 +1,5 @@
-import { getAllBooks } from "../api/bookApi"
+import { searchBooks } from "../api/bookApi"
+import { getCategories } from "../api/categoryApi"
 import BookFilters from "../components/organisms/BookFilters/BookFilters"
 import BookGrid from "../components/organisms/BookGrid/BookGrid"
 import Pagination from "../components/organisms/Pagination/Pagination"
@@ -7,6 +8,7 @@ import { useNavigate } from "react-router-dom"
 import Button from "../components/atoms/Button/Button"
 import { extractApiErrorMessage } from "../utils/apiError"
 import { getCategoryCover } from "../utils/bookCover"
+import { useDebouncedValue } from "../hooks/useDebouncedValue"
 
 type UiBook = {
   id: number
@@ -22,36 +24,75 @@ const BooksPage = () => {
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
   const [books, setBooks] = useState<UiBook[]>([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalElements, setTotalElements] = useState(0)
   const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search, 250)
   const [categoryFilter, setCategoryFilter] = useState("All Genres")
   const [availabilityFilter, setAvailabilityFilter] = useState("All Books")
+  const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const pageSize = 12
 
   useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setCategories(await getCategories())
+      } catch {
+        // Non-blocking; books can still load.
+        setCategories([])
+      }
+    }
+    loadCategories()
+  }, [])
+
+  useEffect(() => {
     const loadBooks = async () => {
       setLoading(true)
       setError(null)
-
       try {
-        const allRawBooks = (await getAllBooks()) as unknown[] as Record<string, unknown>[]
+        const res = await searchBooks({
+          q: debouncedSearch.trim() || undefined,
+          category: categoryFilter === "All Genres" ? undefined : categoryFilter,
+          availability:
+            availabilityFilter === "Available"
+              ? "available"
+              : availabilityFilter === "Unavailable"
+                ? "unavailable"
+                : undefined,
+          page,
+          size: pageSize,
+          sort: "title",
+        })
 
-        const mappedBooks: UiBook[] = allRawBooks.map((book) => {
-          const authors = Array.isArray(book.authors) ? (book.authors as unknown[]).map(String) : []
-          const categories = Array.isArray(book.categories) ? (book.categories as unknown[]).map(String) : []
-          const category = String(book.category ?? categories[0] ?? "General")
+        const mapped: UiBook[] = (Array.isArray(res.content) ? res.content : []).map((book) => {
+          const id = Number(book.bookId ?? book.id ?? 0)
+          const authors = Array.isArray(book.authors)
+            ? (book.authors as unknown[]).map(String)
+            : book.author
+              ? [String(book.author)]
+              : []
+          const categoriesArr = Array.isArray(book.categories)
+            ? (book.categories as unknown[]).map(String)
+            : book.category
+              ? [String(book.category)]
+              : []
+          const category = String(book.category ?? categoriesArr[0] ?? "General")
           return {
-          id: Number(book.id ?? book.bookId ?? 0),
-          title: String(book.title ?? "Untitled"),
-          author: String(book.author ?? authors[0] ?? "Unknown Author"),
-          category,
-          publisher: String(book.publisher ?? "Unknown Publisher"),
-          image: getCategoryCover(category),
-          availableCopies: Number(book.availableCopies ?? book.available_copies ?? 0),
-        }})
+            id,
+            title: String(book.title ?? "Untitled"),
+            author: String(authors[0] ?? "Unknown Author"),
+            category,
+            publisher: String(book.publisher ?? "Unknown Publisher"),
+            image: getCategoryCover(category),
+            availableCopies: Number(book.availableCopies ?? book.available_copies ?? 0),
+          }
+        })
 
-        setBooks(mappedBooks)
+        setBooks(mapped)
+        setTotalPages(Math.max(1, Number(res.totalPages ?? 1)))
+        setTotalElements(Number(res.totalElements ?? 0))
       } catch (err) {
         setError(extractApiErrorMessage(err, "Failed to load books. Please try again."))
       } finally {
@@ -60,32 +101,11 @@ const BooksPage = () => {
     }
 
     loadBooks()
-  }, [])
+  }, [page, pageSize, debouncedSearch, categoryFilter, availabilityFilter])
 
-  const filteredBooks = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return books.filter((book) => {
-      const matchesSearch =
-        q.length === 0 ||
-        [book.title, book.author, book.publisher].some((value) =>
-          value.toLowerCase().includes(q)
-        )
-      const matchesCategory =
-        categoryFilter === "All Genres" || book.category === categoryFilter
-      const matchesAvailability =
-        availabilityFilter === "All Books" ||
-        (availabilityFilter === "Available" ? book.availableCopies > 0 : book.availableCopies <= 0)
-      return matchesSearch && matchesCategory && matchesAvailability
-    })
-  }, [books, search, categoryFilter, availabilityFilter])
-
-  const categories = useMemo(
-    () => Array.from(new Set(books.map((book) => book.category))).sort((a, b) => a.localeCompare(b)),
-    [books]
-  )
-
-  const totalPages = Math.max(1, Math.ceil(filteredBooks.length / pageSize))
-  const pagedBooks = filteredBooks.slice(page * pageSize, (page + 1) * pageSize)
+  useEffect(() => {
+    setPage(0)
+  }, [debouncedSearch, categoryFilter, availabilityFilter])
 
   useEffect(() => {
     if (page > totalPages - 1) {
@@ -125,16 +145,16 @@ const BooksPage = () => {
 
         {!loading && !error && (
           <p className="text-right text-sm text-gray-500">
-            Showing {filteredBooks.length} items • Page {filteredBooks.length === 0 ? 0 : page + 1} of{" "}
-            {filteredBooks.length === 0 ? 0 : totalPages}
+            Showing {totalElements} items • Page {totalElements === 0 ? 0 : page + 1} of{" "}
+            {totalElements === 0 ? 0 : totalPages}
           </p>
         )}
 
         {loading && <p className="text-sm text-gray-500">Loading books...</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {!loading && !error && <BookGrid books={pagedBooks} />}
+        {!loading && !error && <BookGrid books={books} />}
 
-        {!loading && !error && filteredBooks.length > 0 && (
+        {!loading && !error && totalElements > 0 && (
           <Pagination
             currentPage={page}
             totalPages={totalPages}

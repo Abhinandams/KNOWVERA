@@ -10,6 +10,7 @@ import { deleteAdminUser, getAdminUserById, resolveUserProfileImage, updateAdmin
 import { extractApiErrorMessage } from "../utils/apiError";
 import { logAdminActivity } from "../utils/adminActivity";
 import ErrorModal from "../components/organisms/ErrorModal/ErrorModal";
+import { getAuthItem } from "../utils/authStorage";
 
 const toEditableMember = (user: UserResponse): EditableMember => ({
   id: String(user.userId),
@@ -26,6 +27,8 @@ const toEditableMember = (user: UserResponse): EditableMember => ({
 const UserDetailsPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const loggedInUserId = Number(getAuthItem("userId") ?? 0);
+  const isSelf = Number(id ?? 0) === loggedInUserId;
   const [member, setMember] = useState<EditableMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -129,8 +132,11 @@ const UserDetailsPage = () => {
         <Button
           type="button"
           variant="danger"
+          disabled={isSelf}
+          className={isSelf ? "opacity-60 cursor-not-allowed" : ""}
           onClick={async () => {
             if (!id) return;
+            if (isSelf) return;
             try {
               await deleteAdminUser(id);
               logAdminActivity({

@@ -67,9 +67,12 @@ export const getBookById = async (id: number | string) => {
 };
 
 export const searchBooks = async (params?: {
+  q?: string;
   title?: string;
   author?: string;
   category?: string;
+  publisher?: string;
+  availability?: "available" | "unavailable";
   page?: number;
   size?: number;
   sort?: string;

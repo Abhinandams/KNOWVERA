@@ -110,10 +110,20 @@ const BookDetailsPage = () => {
               updatedBook.availableCopies ?? (updatedBook.status === "Available" ? totalCopies : 0)
             );
             const availableCopies = Math.min(totalCopies, Math.max(0, Number.isFinite(requestedAvailable) ? requestedAvailable : 0));
+            const authors = String(updatedBook.author ?? "")
+              .split(",")
+              .map((a) => a.trim())
+              .filter(Boolean);
+            const categories = String(updatedBook.category ?? "")
+              .split(",")
+              .map((c) => c.trim())
+              .filter(Boolean);
             const payload = {
               title: updatedBook.title,
-              author: updatedBook.author,
-              category: updatedBook.category,
+              author: authors[0] ?? updatedBook.author,
+              category: categories[0] ?? updatedBook.category,
+              authors,
+              categories,
               publisher: updatedBook.publisher,
               isbn: updatedBook.isbn,
               language: updatedBook.language,
